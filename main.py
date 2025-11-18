@@ -1,76 +1,73 @@
-from greetings import Greetings
-diseases_list = []
-diseases_symptoms = []
-symptom_map = {}
-d_desc_map = {}
-d_treatment_map = {}
+from tkinter import *
+from tkinter import messagebox
+from experta import *
 
-#loads the knowledge from .txt files into variables to allow the code to use it
-def preprocess():
-    #global diseases_list, diseases_symptoms, symptom_map, d_desc_map, d_treatment_map
-    diseases = open("diseases.txt")
-    diseases_t = diseases.read()
-    diseases_list = diseases_t.split("\n")
-    diseases.close()
+# -------------------------------
+# Expert System
+# -------------------------------
+class Symptoms(Fact):
+    fever = Field(str)
+    cough = Field(str)
+    breathing = Field(str)
 
-    for disease in diseases_list:
-        disease_s_file = open("Disease symptoms/" + disease + ".txt")
-        disease_s_data = disease_s_file.read()
-        s_list = disease_s_data.split("\n")
-        diseases_symptoms.append(s_list)
-        symptom_map[str(s_list)] = disease
-        disease_s_file.close()
+class CovidExpert(KnowledgeEngine):
 
-        disease_s_file = open("Disease descriptions/" + disease + ".txt")
-        disease_s_data = disease_s_file.read()
-        d_desc_map[disease] = disease_s_data
-        disease_s_file.close()
+    @Rule(Symptoms(fever=MATCH.f, cough=MATCH.c, breathing=MATCH.b))
+    def diagnose(self, f, c, b):
+        # Count number of 'yes' symptoms
+        yes_count = sum([f == 'yes', c == 'yes', b == 'yes'])
+        if yes_count == 0:
+            result = "Low risk of COVID-19"
+        elif yes_count == 1:
+            result = "Low risk of COVID-19"
+        elif yes_count == 2:
+            result = "Medium risk of COVID-19"
+        else:  # yes_count == 3
+            result = "High risk of COVID-19"
+        self.declare(Fact(result=result))
 
-        disease_s_file = open("Disease treatments/" + disease + ".txt")
-        disease_s_data = disease_s_file.read()
-        d_treatment_map[disease] = disease_s_data
-        disease_s_file.close()
+    @Rule(Fact(result=MATCH.r))
+    def show_result(self, r):
+        self.result = r
 
+# -------------------------------
+# Tkinter GUI
+# -------------------------------
+def run_expert_system():
+    engine = CovidExpert()
+    engine.reset()
+    engine.declare(Symptoms(
+        fever=fever_var.get(),
+        cough=cough_var.get(),
+        breathing=breathing_var.get()
+    ))
+    engine.run()
 
-def identify_disease(*arguments):
-    symptom_list = []
-    for symptom in arguments:
-        symptom_list.append(symptom)
+    messagebox.showinfo("Diagnosis Result", engine.result)
 
-    return symptom_map[str(symptom_list)]
+# GUI setup
+root = Tk()
+root.title("COVID-19 Diagnosis Expert System")
+root.geometry("420x320")
 
+Label(root, text="COVID-19 Expert System",
+      font=("Arial", 16, "bold")).pack(pady=15)
 
-def get_details(disease):
-    return d_desc_map[disease]
+fever_var = StringVar(value="no")
+cough_var = StringVar(value="no")
+breathing_var = StringVar(value="no")
 
+def add_selector(text, variable):
+    frame = Frame(root)
+    frame.pack(pady=5)
+    Label(frame, text=text, width=22, anchor="w").pack(side=LEFT)
+    OptionMenu(frame, variable, "yes", "no").pack(side=LEFT)
 
-def get_treatments(disease):
-    return d_treatment_map[disease]
+add_selector("Do you have fever?", fever_var)
+add_selector("Do you have cough?", cough_var)
+add_selector("Difficulty breathing?", breathing_var)
 
+Button(root, text="Diagnose Now", font=("Arial", 12, "bold"),
+       command=run_expert_system).pack(pady=20)
 
-def if_not_matched(disease):
-    print("")
-    id_disease = disease
-    disease_details = get_details(id_disease)
-    treatments = get_treatments(id_disease)
-    print("")
-    print("The most probable disease that you have is %s\n" % (id_disease))
-    print("A short description of the disease is given below :\n")
-    print(disease_details + "\n")
-    print(
-        "The common medications and procedures suggested by other real doctors are: \n"
-    )
-    print(treatments + "\n")
-
-#driver function
-if __name__ == "__main__":
-    preprocess()
-    #creating class object
-    engine = Greetings(symptom_map, if_not_matched, get_treatments, get_details)
-    #loop to keep running the code until user says no when asked for another diagnosis
-    while 1:
-        engine.reset()
-        engine.run()
-        print("Would you like to diagnose some other symptoms?\n Reply yes or no")
-        if input() == "no":
-            exit()
+root.mainloop()
